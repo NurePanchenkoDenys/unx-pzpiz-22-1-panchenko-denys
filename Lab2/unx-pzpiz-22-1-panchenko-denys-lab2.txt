@@ -1,0 +1,608 @@
+﻿Харківський національний університет радіоелектроніки
+Факультет комп'ютерних наук
+Катедра програмної інженерії
+
+
+
+
+
+ЗВІТ
+до лабораторної роботи № 2
+з дисципліни «Операційні системи Unix»
+на тему: «Збір та обробка інформації
+про платформу у середовищі Unix/Linux»
+
+
+
+
+Виконав
+ст. гр. ПЗПІз-22-1
+Панченко Денис
+
+Перевірив
+ст. викладач катедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+Харків 2026
+
+
+1 ІСТОРІЯ ЗМІН
+
+№ДатаВерсіяОпис змін та виправлень128.03.20260.1Створено розділ «Завдання»228.03.20260.2Створено розділ «Опис виконаної роботи»328.03.20260.3Додано висновки та додатки428.03.20261.0Фінальна версія звіту
+
+2 ЗАВДАННЯ
+
+     Розробити Bash-скрипт, який виконує збір базової інформації про апаратне забезпечення, операційну систему та мережеві інтерфейси і виводить її у стандартизованому форматі.
+
+     Вимоги до скрипта:
+     1) Збирати дані про CPU, RAM, материнську плату та серійний номер (Hardware).
+     2) Збирати дані про дистрибутив ОС, версію ядра, дату встановлення, ім'я вузла, час роботи, кількість процесів та користувачів (System).
+     3) Збирати інформацію про всі мережеві інтерфейси з IP-адресами та масками (Network).
+     4) Виводити результат у стандартний потік та одночасно записувати у файл через tee.
+     5) Реалізувати ротацію файлів з шаблоном YYYYMMDD-NNNN та параметром -n.
+     6) Забезпечити локалізацію повідомлень та обробку помилок.
+     7) Формат дати не повинен залежати від локалізації (LC_ALL=C).
+
+
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+
+3.1 Загальна структура скрипта
+
+     Скрипт має модульну структуру з окремими функціями для кожної задачі: обробка параметрів, робота з файлами, збір інформації про апаратне забезпечення, систему та мережу, форматування виводу.
+     Результат виводиться одночасно у стандартний потік виведення та у файл за допомогою команди tee. Файл за замовчуванням - ~/log/task2.out.
+
+3.2 Обробка параметрів та робота з файлами
+
+     Обробка параметрів реалізована аналогічно до попередніх робіт: підтримка -h/--help, -n для обмеження архівів, позиційний аргумент для шляху до файлу. Ротація файлів та очищення архівів використовують ту ж логіку з шаблоном YYYYMMDD-NNNN.
+
+3.3 Збір інформації про апаратне забезпечення (Hardware)
+
+     CPU - функція get_cpu перевіряє наявність утиліти lscpu (Linux), файлу /proc/cpuinfo або sysctl (macOS). На macOS використовується sysctl -n machdep.cpu.brand_string.
+
+     RAM - функція get_ram зчитує дані з /proc/meminfo (Linux) або sysctl -n hw.memsize (macOS) та переводить у мегабайти.
+
+     Motherboard - функція get_motherboard намагається використати dmidecode (потребує sudo), файл ~/dmidecode.out як резерв, або sysctl hw.model на macOS.
+
+     Serial Number - функція get_serial використовує dmidecode або утиліту ioreg на macOS для отримання серійного номера.
+
+3.4 Збір інформації про систему (System)
+
+     OS Distribution - зчитується з /etc/os-release (Linux) або через sw_vers (macOS).
+     Kernel - визначається командою uname -r.
+     Installation date - визначається через stat / з різними параметрами для GNU stat (Linux) та BSD stat (macOS).
+     Hostname - визначається командою hostname.
+     Uptime - визначається командою uptime з обробкою через sed.
+     Processes - підраховуються через ps aux з підрахунком рядків.
+     Users - підраховуються через команду who.
+
+3.5 Збір мережевої інформації (Network)
+
+     На Linux використовується ip -o addr show з обробкою через awk для виведення інтерфейсів з IP та маскою у форматі CIDR.
+     На macOS використовується ifconfig з ручним перетворенням шістнадцяткової маски у CIDR-нотацію. Для кожного інтерфейсу виводиться рядок у форматі: <ім'я>: <IP>/<маска>.
+
+3.6 Форматування виводу
+
+     Функція collect_info збирає всі дані та форматує вивід відповідно до вимог. Дата та мітка часу Unix формуються з одного значення epoch для забезпечення відповідності одному моменту часу. Вивід передається через tee для одночасного запису у файл.
+
+3.7 Результат виконання скрипта
+
+     Запуск на macOS (Apple M2, 16 ГБ RAM):
+
+     Date: Fri, 27 Mar 2026 22:56:31 +0100
+     Unix Timestamp: 1774648591
+     ---- Hardware ----
+     CPU: "Apple M2"
+     RAM: 16384 MB
+     Motherboard: "Mac14,15", "Apple Silicon"
+     System Serial Number: H52F4KD632
+     ---- System ----
+     OS Distribution: "macOS 26.3"
+     Kernel version: 25.3.0
+     Installation date: 2026-02-05
+     Hostname: Denyss-Laptop.local
+     Uptime: 37 days, 9:21
+     Processes running: 611
+     Users logged in: 7
+     ---- Network ----
+     lo0: 127.0.0.1/8
+     en0: 172.20.10.3/28
+     ----"EOF"----
+
+
+
+4 ВИСНОВКИ
+
+     У ході виконання лабораторної роботи було розроблено Bash-скрипт для збору та обробки системної інформації у стандартизованому форматі.
+
+     Скрипт збирає дані про апаратне забезпечення (процесор, оперативну пам'ять, материнську плату, серійний номер), операційну систему (дистрибутив, ядро, дата встановлення, час роботи, процеси, користувачі) та мережеві інтерфейси (IP-адреси з масками у форматі CIDR).
+
+     Реалізовано кросплатформну сумісність: скрипт коректно працює як на Linux (lscpu, ip addr, /proc), так і на macOS (sysctl, ifconfig, ioreg). Для кожного джерела даних передбачено альтернативні методи отримання інформації.
+
+     Забезпечено одночасний вивід у стандартний потік та запис у файл через tee, ротацію файлів з нумерацією та керування кількістю архівів.
+
+     Набуто практичні навички роботи з утилітами системного рівня, форматування виводу, обробки параметрів командного рядка та запису даних у файли.
+
+
+ДОДАТОК А
+
+Відеозапис
+
+     Відеозапис доповіді на YouTube: https://youtu.be/1uCrSHMDmyg
+
+     Хронологічний опис відеозапису:
+
+     00:00 - Вступ. Представлення автора, теми та мети лабораторної роботи.
+     00:14 - Глобальні змінні. Файл за замовчуванням, максимум архівних файлів.
+     00:54 - Допоміжні функції. Визначення мови, довідка, обробка аргументів.
+     01:44 - Робота з каталогами та ротація файлів. Створення, перейменування, видалення архівів.
+     03:46 - Отримання CPU та RAM. Підтримка Linux та macOS, sysctl для Apple M2.
+     06:12 - Материнська плата та серійний номер. dmidecode, ioreg на macOS.
+     08:08 - Інформація про систему. Дистрибутив ОС, ядро, процеси, користувачі.
+     09:20 - Мережеві інтерфейси та функція collect_info. Збір та форматування виводу.
+     09:58 - Демонстрація роботи. Запуск скрипта, перегляд результатів на macOS.
+     10:10 - Аналіз виводу. CPU, RAM, дистрибутив, uptime, процеси, користувачі.
+     12:26 - Завершення відеозвіту.
+
+
+ДОДАТОК Б
+
+Приклад програмного коду
+
+  1  #!/bin/bash
+  2  
+  3  # =============================================================================
+  4  # Лабораторна робота №2 - Операційні системи Unix
+  5  # Тема: Збір та обробка інформації про платформу у середовищі Unix/Linux
+  6  # Автор: Панченко Денис, гр. ПЗПІз-22-1
+  7  # =============================================================================
+  8  
+  9  # --- Файл за замовчуванням ---
+ 10  DEFAULT_FILE="$HOME/log/task2.out"
+ 11  MAX_FILES=""
+ 12  OUTPUT_FILE=""
+ 13  
+ 14  # =============================================================================
+ 15  # Функція: визначення мови повідомлень
+ 16  # =============================================================================
+ 17  is_ukrainian() {
+ 18      local lang="${LC_MESSAGES:-$LANG}"
+ 19      [[ "$lang" == uk_UA* ]]
+ 20  }
+ 21  
+ 22  # =============================================================================
+ 23  # Функція: повідомлення про помилку у stderr
+ 24  # =============================================================================
+ 25  error_msg() {
+ 26      if is_ukrainian; then
+ 27          echo "Помилка: $1" >&2
+ 28      else
+ 29          echo "Error: $1" >&2
+ 30      fi
+ 31  }
+ 32  
+ 33  # =============================================================================
+ 34  # Функція: інформаційне повідомлення
+ 35  # =============================================================================
+ 36  info_msg() {
+ 37      if is_ukrainian; then
+ 38          echo "$1"
+ 39      else
+ 40          echo "$2"
+ 41      fi
+ 42  }
+ 43  
+ 44  # =============================================================================
+ 45  # Функція: довідка
+ 46  # =============================================================================
+ 47  show_help() {
+ 48      if is_ukrainian; then
+ 49          cat <<EOF
+ 50  Використання: $0 [-h|--help] [-n кількість] [файл]
+ 51  
+ 52  Опис:
+ 53    Скрипт збирає інформацію про апаратне забезпечення, операційну систему
+ 54    та мережеві інтерфейси і виводить у стандартизованому форматі.
+ 55  
+ 56  Параметри:
+ 57    -h, --help     Вивести довідку
+ 58    -n кількість   Максимальна кількість архівних файлів
+ 59    файл           Шлях до файлу (за замовчуванням: ~/log/task2.out)
+ 60  EOF
+ 61      else
+ 62          cat <<EOF
+ 63  Usage: $0 [-h|--help] [-n count] [file]
+ 64  
+ 65  Description:
+ 66    Script collects hardware, system and network information
+ 67    and outputs it in a standardized format.
+ 68  
+ 69  Options:
+ 70    -h, --help   Show help
+ 71    -n count     Maximum number of archived files
+ 72    file         Output file (default: ~/log/task2.out)
+ 73  EOF
+ 74      fi
+ 75  }
+ 76  
+ 77  # =============================================================================
+ 78  # Функція: обробка параметрів командного рядка
+ 79  # =============================================================================
+ 80  parse_args() {
+ 81      while [ $# -gt 0 ]; do
+ 82          case "$1" in
+ 83              -h|--help)
+ 84                  show_help
+ 85                  exit 0
+ 86                  ;;
+ 87              -n)
+ 88                  shift
+ 89                  if [ -z "$1" ]; then
+ 90                      error_msg "$(is_ukrainian && echo "параметр -n потребує значення" || echo "option -n requires a value")"
+ 91                      exit 1
+ 92                  fi
+ 93                  if ! [[ "$1" =~ ^[1-9][0-9]*$ ]]; then
+ 94                      error_msg "$(is_ukrainian && echo "значення -n повинно бути цілим числом >= 1" || echo "-n value must be an integer >= 1")"
+ 95                      exit 1
+ 96                  fi
+ 97                  MAX_FILES="$1"
+ 98                  ;;
+ 99              -*)
+100                  error_msg "$(is_ukrainian && echo "невідомий параметр: $1" || echo "unknown option: $1")"
+101                  exit 1
+102                  ;;
+103              *)
+104                  if [ -n "$OUTPUT_FILE" ]; then
+105                      error_msg "$(is_ukrainian && echo "зайвий аргумент: $1" || echo "extra argument: $1")"
+106                      exit 1
+107                  fi
+108                  OUTPUT_FILE="$1"
+109                  ;;
+110          esac
+111          shift
+112      done
+113  
+114      if [ -z "$OUTPUT_FILE" ]; then
+115          OUTPUT_FILE="$DEFAULT_FILE"
+116      fi
+117  }
+118  
+119  # =============================================================================
+120  # Функція: створення каталогу
+121  # =============================================================================
+122  ensure_directory() {
+123      local dir
+124      dir="$(dirname "$OUTPUT_FILE")"
+125      if [ ! -d "$dir" ]; then
+126          if ! mkdir -p "$dir" 2>/dev/null; then
+127              error_msg "$(is_ukrainian && echo "неможливо створити каталог: $dir" || echo "cannot create directory: $dir")"
+128              exit 1
+129          fi
+130      fi
+131  }
+132  
+133  # =============================================================================
+134  # Функція: ротація файлу
+135  # =============================================================================
+136  rotate_file() {
+137      if [ ! -f "$OUTPUT_FILE" ]; then
+138          return
+139      fi
+140  
+141      local base dir today max_num next_num new_name
+142      base="$(basename "$OUTPUT_FILE")"
+143      dir="$(dirname "$OUTPUT_FILE")"
+144      today="$(date +%Y%m%d)"
+145      max_num=-1
+146  
+147      for existing in "$dir"/${base}-${today}-*; do
+148          if [ -f "$existing" ]; then
+149              local num_part
+150              num_part="$(basename "$existing" | sed "s/^${base}-${today}-//")"
+151              if [[ "$num_part" =~ ^[0-9]+$ ]]; then
+152                  local decimal_num=$((10#$num_part))
+153                  if [ "$decimal_num" -gt "$max_num" ]; then
+154                      max_num="$decimal_num"
+155                  fi
+156              fi
+157          fi
+158      done
+159  
+160      next_num=$((max_num + 1))
+161      new_name=$(printf "%s/%s-%s-%04d" "$dir" "$base" "$today" "$next_num")
+162  
+163      if ! mv "$OUTPUT_FILE" "$new_name" 2>/dev/null; then
+164          error_msg "$(is_ukrainian && echo "неможливо перейменувати файл" || echo "cannot rename file")"
+165          exit 1
+166      fi
+167  }
+168  
+169  # =============================================================================
+170  # Функція: очищення старих архівів
+171  # =============================================================================
+172  cleanup_archives() {
+173      if [ -z "$MAX_FILES" ]; then
+174          return
+175      fi
+176  
+177      local base dir
+178      base="$(basename "$OUTPUT_FILE")"
+179      dir="$(dirname "$OUTPUT_FILE")"
+180  
+181      local archives=()
+182      while IFS= read -r f; do
+183          archives+=("$f")
+184      done < <(find "$dir" -maxdepth 1 -name "${base}-[0-9]*-[0-9]*" -type f | sort)
+185  
+186      local count=${#archives[@]}
+187      local to_delete=$((count - MAX_FILES))
+188  
+189      if [ "$to_delete" -gt 0 ]; then
+190          for ((i = 0; i < to_delete; i++)); do
+191              rm -f "${archives[$i]}"
+192          done
+193      fi
+194  }
+195  
+196  # =============================================================================
+197  # Функція: отримання інформації про CPU
+198  # =============================================================================
+199  get_cpu() {
+200      if command -v lscpu &>/dev/null; then
+201          lscpu | awk -F: '/Model name/ {gsub(/^[ \t]+/, "", $2); print $2; exit}'
+202      elif [ -f /proc/cpuinfo ]; then
+203          awk -F: '/model name/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' /proc/cpuinfo
+204      elif command -v sysctl &>/dev/null; then
+205          sysctl -n machdep.cpu.brand_string 2>/dev/null
+206      else
+207          echo "Unknown"
+208      fi
+209  }
+210  
+211  # =============================================================================
+212  # Функція: отримання інформації про RAM (у МБ)
+213  # =============================================================================
+214  get_ram() {
+215      if [ -f /proc/meminfo ]; then
+216          awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo
+217      elif command -v sysctl &>/dev/null; then
+218          local bytes
+219          bytes=$(sysctl -n hw.memsize 2>/dev/null)
+220          if [ -n "$bytes" ]; then
+221              echo $((bytes / 1024 / 1024))
+222          else
+223              echo "Unknown"
+224          fi
+225      else
+226          echo "Unknown"
+227      fi
+228  }
+229  
+230  # =============================================================================
+231  # Функція: отримання інформації про материнську плату
+232  # =============================================================================
+233  get_motherboard() {
+234      local manufacturer product
+235  
+236      if command -v dmidecode &>/dev/null; then
+237          manufacturer=$(sudo dmidecode -s baseboard-manufacturer 2>/dev/null || echo "Unknown")
+238          product=$(sudo dmidecode -s baseboard-product-name 2>/dev/null || echo "Unknown")
+239      elif [ -f "$HOME/dmidecode.out" ]; then
+240          manufacturer=$(grep -i "baseboard-manufacturer" "$HOME/dmidecode.out" 2>/dev/null | head -1 | cut -d: -f2 | xargs)
+241          product=$(grep -i "baseboard-product-name" "$HOME/dmidecode.out" 2>/dev/null | head -1 | cut -d: -f2 | xargs)
+242      elif command -v sysctl &>/dev/null; then
+243          manufacturer=$(sysctl -n hw.model 2>/dev/null || echo "Unknown")
+244          product="Apple Silicon"
+245      else
+246          manufacturer="Unknown"
+247          product="Unknown"
+248      fi
+249  
+250      [ -z "$manufacturer" ] && manufacturer="Unknown"
+251      [ -z "$product" ] && product="Unknown"
+252  
+253      echo "\"$manufacturer\", \"$product\""
+254  }
+255  
+256  # =============================================================================
+257  # Функція: отримання серійного номера
+258  # =============================================================================
+259  get_serial() {
+260      if command -v dmidecode &>/dev/null; then
+261          sudo dmidecode -s system-serial-number 2>/dev/null || echo "Unknown"
+262      elif [ -f "$HOME/dmidecode.out" ]; then
+263          grep -i "system-serial-number" "$HOME/dmidecode.out" 2>/dev/null | head -1 | cut -d: -f2 | xargs
+264      elif command -v ioreg &>/dev/null; then
+265          ioreg -l | awk -F'"' '/IOPlatformSerialNumber/ {print $4; exit}' 2>/dev/null || echo "Unknown"
+266      else
+267          echo "Unknown"
+268      fi
+269  }
+270  
+271  # =============================================================================
+272  # Функція: отримання назви дистрибутива ОС
+273  # =============================================================================
+274  get_os_distribution() {
+275      if [ -f /etc/os-release ]; then
+276          . /etc/os-release
+277          echo "$PRETTY_NAME"
+278      elif command -v sw_vers &>/dev/null; then
+279          echo "$(sw_vers -productName) $(sw_vers -productVersion)"
+280      else
+281          uname -s
+282      fi
+283  }
+284  
+285  # =============================================================================
+286  # Функція: отримання дати встановлення ОС
+287  # =============================================================================
+288  get_install_date() {
+289      if command -v stat &>/dev/null; then
+290          if stat --version &>/dev/null 2>&1; then
+291              # Linux (GNU stat)
+292              stat -c %w / 2>/dev/null | cut -d' ' -f1
+293          else
+294              # macOS (BSD stat)
+295              stat -f "%SB" -t "%Y-%m-%d" / 2>/dev/null
+296          fi
+297      else
+298          echo "Unknown"
+299      fi
+300  }
+301  
+302  # =============================================================================
+303  # Функція: отримання часу роботи (uptime)
+304  # =============================================================================
+305  get_uptime() {
+306      uptime | sed 's/.*up //' | sed 's/,  *[0-9]* user.*//' | xargs
+307  }
+308  
+309  # =============================================================================
+310  # Функція: отримання кількості процесів
+311  # =============================================================================
+312  get_processes() {
+313      ps aux 2>/dev/null | wc -l | xargs
+314  }
+315  
+316  # =============================================================================
+317  # Функція: отримання кількості залогінених користувачів
+318  # =============================================================================
+319  get_users() {
+320      who 2>/dev/null | wc -l | xargs
+321  }
+322  
+323  # =============================================================================
+324  # Функція: отримання мережевих інтерфейсів
+325  # =============================================================================
+326  get_network() {
+327      if command -v ip &>/dev/null; then
+328          # Linux: ip addr
+329          ip -o addr show 2>/dev/null | awk '{
+330              iface = $2
+331              if ($3 == "inet") {
+332                  split($4, a, "/")
+333                  printf "%s: %s/%s\n", iface, a[1], a[2]
+334              }
+335          }' | sort -u
+336      elif command -v ifconfig &>/dev/null; then
+337          # macOS: ifconfig
+338          local current_iface=""
+339          ifconfig 2>/dev/null | while IFS= read -r line; do
+340              if echo "$line" | grep -qE '^[a-zA-Z0-9]+:'; then
+341                  current_iface=$(echo "$line" | cut -d: -f1)
+342              elif echo "$line" | grep -q 'inet '; then
+343                  local ip mask
+344                  ip=$(echo "$line" | awk '{print $2}')
+345                  mask=$(echo "$line" | awk '{for(i=1;i<=NF;i++) if($i=="netmask") print $(i+1)}')
+346                  if [ -n "$ip" ] && [ -n "$mask" ]; then
+347                      # Перетворення hex маски у CIDR (macOS)
+348                      local cidr=0
+349                      if [[ "$mask" == 0x* ]]; then
+350                          local hex="${mask#0x}"
+351                          local bin=""
+352                          for ((c=0; c<${#hex}; c++)); do
+353                              local digit="${hex:$c:1}"
+354                              case "$digit" in
+355                                  0) bin="${bin}0000" ;; 1) bin="${bin}0001" ;; 2) bin="${bin}0010" ;; 3) bin="${bin}0011" ;;
+356                                  4) bin="${bin}0100" ;; 5) bin="${bin}0101" ;; 6) bin="${bin}0110" ;; 7) bin="${bin}0111" ;;
+357                                  8) bin="${bin}1000" ;; 9) bin="${bin}1001" ;; a|A) bin="${bin}1010" ;; b|B) bin="${bin}1011" ;;
+358                                  c|C) bin="${bin}1100" ;; d|D) bin="${bin}1101" ;; e|E) bin="${bin}1110" ;; f|F) bin="${bin}1111" ;;
+359                              esac
+360                          done
+361                          cidr=$(echo "$bin" | grep -o "1" | wc -l | xargs)
+362                      elif [[ "$mask" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+363                          # Десяткова маска
+364                          IFS='.' read -r o1 o2 o3 o4 <<< "$mask"
+365                          for octet in $o1 $o2 $o3 $o4; do
+366                              while [ "$octet" -gt 0 ]; do
+367                                  cidr=$((cidr + (octet & 1)))
+368                                  octet=$((octet >> 1))
+369                              done
+370                          done
+371                      fi
+372                      echo "${current_iface}: ${ip}/${cidr}"
+373                  fi
+374              fi
+375          done
+376      fi
+377  }
+378  
+379  # =============================================================================
+380  # Функція: збір та форматування всієї інформації
+381  # =============================================================================
+382  collect_info() {
+383      local date_str timestamp
+384  
+385      # Дата та мітка часу повинні відповідати одному моменту
+386      local epoch
+387      epoch=$(date +%s)
+388      date_str=$(LC_ALL=C date -r "$epoch" "+Date: %a, %d %b %Y %H:%M:%S %z" 2>/dev/null || LC_ALL=C date -d "@$epoch" "+Date: %a, %d %b %Y %H:%M:%S %z" 2>/dev/null || LC_ALL=C date "+Date: %a, %d %b %Y %H:%M:%S %z")
+389      timestamp="Unix Timestamp: $epoch"
+390  
+391      local cpu ram motherboard serial
+392      cpu=$(get_cpu)
+393      ram=$(get_ram)
+394      motherboard=$(get_motherboard)
+395      serial=$(get_serial)
+396  
+397      local os_dist kernel install_date hostname_val uptime_val procs users
+398      os_dist=$(get_os_distribution)
+399      kernel=$(uname -r)
+400      install_date=$(get_install_date)
+401      hostname_val=$(hostname)
+402      uptime_val=$(get_uptime)
+403      procs=$(get_processes)
+404      users=$(get_users)
+405  
+406      local network
+407      network=$(get_network)
+408  
+409      # Формування виводу
+410      echo "$date_str"
+411      echo "$timestamp"
+412      echo "---- Hardware ----"
+413      echo "CPU: \"$cpu\""
+414      echo "RAM: $ram MB"
+415      echo "Motherboard: $motherboard"
+416      echo "System Serial Number: $serial"
+417      echo "---- System ----"
+418      echo "OS Distribution: \"$os_dist\""
+419      echo "Kernel version: $kernel"
+420      echo "Installation date: $install_date"
+421      echo "Hostname: $hostname_val"
+422      echo "Uptime: $uptime_val"
+423      echo "Processes running: $procs"
+424      echo "Users logged in: $users"
+425      echo "---- Network ----"
+426      if [ -n "$network" ]; then
+427          echo "$network"
+428      else
+429          echo "-/-"
+430      fi
+431      echo "----\"EOF\"----"
+432  }
+433  
+434  # =============================================================================
+435  # ГОЛОВНА ЧАСТИНА
+436  # =============================================================================
+437  
+438  parse_args "$@"
+439  ensure_directory
+440  rotate_file
+441  cleanup_archives
+442  
+443  # Збір та вивід інформації (stdout + файл через tee)
+444  collect_info | tee "$OUTPUT_FILE"
+445  
+446  exit 0
+447  
+
+Приклади запитів до сервісів ШІ
+
+     Запит 1: «Напиши Bash-скрипт для збору системної інформації у Unix/Linux. Вивід у форматі: Date (RFC 2822 з LC_ALL=C), Unix Timestamp (з того ж epoch), Hardware (CPU через lscpu або sysctl на macOS, RAM з /proc/meminfo або sysctl hw.memsize, Motherboard через dmidecode або ~/dmidecode.out як резерв або sysctl hw.model на macOS, Serial через dmidecode або ioreg на macOS), System (OS з /etc/os-release або sw_vers, Kernel через uname -r, Installation date через stat /, Hostname, Uptime, Processes через ps aux, Users через who), Network (ip -o addr на Linux або ifconfig на macOS з перетворенням hex маски у CIDR). Вивід через tee у файл. Ротація файлів YYYYMMDD-NNNN з -n для обмеження. Параметри -h, -n, [file]. Локалізація uk_UA/en. Unknown для недоступних значень.»
+
+     Відповідь: ШІ згенерував скрипт з підтримкою Linux та macOS. Після тестування на macOS було виправлено перетворення hex-маски підмережі у CIDR-нотацію для ifconfig та додано підтримку BSD-версії stat для визначення дати встановлення ОС.
+1
+
